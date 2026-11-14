@@ -5,10 +5,14 @@ import './App.css'
 
 function App() {
   const [tasks, setTasks] = useState([])
+
   const [token, setToken] = useState(
     sessionStorage.getItem('token') || ''
   )
+
+  const [newTask, setNewTask] = useState('')
   const [loading, setLoading] = useState(false)
+  const [adding, setAdding] = useState(false)
   const [error, setError] = useState('')
 
   async function loadTasks() {
@@ -42,6 +46,34 @@ function App() {
     await loadTasks()
   }
 
+  async function handleAddTask(event) {
+    event.preventDefault()
+
+    const title = newTask.trim()
+
+    if (!title) {
+      return
+    }
+
+    if (!sessionStorage.getItem('token')) {
+      setError('Please enter your API token first')
+      return
+    }
+
+    setAdding(true)
+    setError('')
+
+    try {
+      await todoApi.createTask(title)
+      setNewTask('')
+      await loadTasks()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setAdding(false)
+    }
+  }
+
   return (
     <div className="todo-container">
       <h1>My ToDo List</h1>
@@ -59,17 +91,31 @@ function App() {
         </button>
       </div>
 
-      <div className="todo-form">
+      <form
+        className="todo-form"
+        onSubmit={handleAddTask}
+      >
         <input
           type="text"
           placeholder="Enter a new task..."
+          value={newTask}
+          maxLength={255}
+          onChange={(e) => setNewTask(e.target.value)}
         />
-        <button disabled>Add</button>
-      </div>
+
+        <button
+          type="submit"
+          disabled={adding || !newTask.trim()}
+        >
+          {adding ? 'Adding...' : 'Add'}
+        </button>
+      </form>
 
       {loading && <p>Loading tasks...</p>}
 
-      {error && <p className="error">{error}</p>}
+      {error && (
+        <p className="error">{error}</p>
+      )}
 
       {!loading && !error && tasks.length === 0 && (
         <p>No tasks found.</p>
@@ -87,7 +133,10 @@ function App() {
 
             <span>{task.title}</span>
 
-            <button className="delete-btn" disabled>
+            <button
+              className="delete-btn"
+              disabled
+            >
               Delete
             </button>
           </div>

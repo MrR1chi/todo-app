@@ -93,3 +93,14 @@ button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+
+.todo-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.todo-form input:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
