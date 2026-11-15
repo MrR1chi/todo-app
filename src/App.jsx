@@ -13,6 +13,7 @@ function App() {
   const [newTask, setNewTask] = useState('')
   const [loading, setLoading] = useState(false)
   const [adding, setAdding] = useState(false)
+  const [updatingId, setUpdatingId] = useState(null)
   const [error, setError] = useState('')
 
   async function loadTasks() {
@@ -74,6 +75,31 @@ function App() {
     }
   }
 
+  async function handleToggleTask(task) {
+    if (updatingId !== null) {
+      return
+    }
+
+    setUpdatingId(task.id)
+    setError('')
+
+    try {
+      await todoApi.updateTask(task.id, {
+        marked_as_done: !task.marked_as_done
+      })
+
+      await loadTasks()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  const completedCount = tasks.filter(
+    (task) => task.marked_as_done
+  ).length
+
   return (
     <div className="todo-container">
       <h1>My ToDo List</h1>
@@ -111,6 +137,10 @@ function App() {
         </button>
       </form>
 
+      <p className="task-counter">
+        Completed: {completedCount} / {tasks.length}
+      </p>
+
       {loading && <p>Loading tasks...</p>}
 
       {error && (
@@ -126,12 +156,18 @@ function App() {
           <div className="todo-item" key={task.id}>
             <input
               type="checkbox"
-              checked={task.marked_as_done}
-              disabled
-              readOnly
+              checked={Boolean(task.marked_as_done)}
+              disabled={updatingId !== null || loading}
+              onChange={() => handleToggleTask(task)}
             />
 
-            <span>{task.title}</span>
+            <span
+              className={
+                task.marked_as_done ? 'completed' : ''
+              }
+            >
+              {task.title}
+            </span>
 
             <button
               className="delete-btn"

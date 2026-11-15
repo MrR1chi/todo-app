@@ -104,3 +104,27 @@ button:disabled {
   outline: 2px solid #2563eb;
   outline-offset: 1px;
 }
+
+
+.todo-item .completed {
+  text-decoration: line-through;
+  color: #9ca3af;
+}
+
+.todo-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #16a34a;
+}
+
+.todo-item input[type="checkbox"]:disabled {
+  cursor: wait;
+}
+
+.task-counter {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 15px;
+  text-align: right;
+}
