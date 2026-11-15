@@ -16,15 +16,23 @@ function App() {
   const [updatingId, setUpdatingId] = useState(null)
   const [error, setError] = useState('')
 
-  // Editing states
+  // Editing
   const [editingId, setEditingId] = useState(null)
   const [editTitle, setEditTitle] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
 
-  // Deleting state
+  // Deleting
   const [deletingId, setDeletingId] = useState(null)
 
-  // Get tasks from the server
+  // Registration
+  const [showRegister, setShowRegister] = useState(false)
+  const [username, setUsername] = useState('')
+  const [firstname, setFirstname] = useState('')
+  const [lastname, setLastname] = useState('')
+  const [password, setPassword] = useState('')
+  const [registering, setRegistering] = useState(false)
+
+  // Get tasks from API
   async function loadTasks() {
     setLoading(true)
     setError('')
@@ -40,14 +48,14 @@ function App() {
     }
   }
 
-  // Load tasks when the page opens
+  // Load tasks on page opening
   useEffect(() => {
     if (sessionStorage.getItem('token')) {
       loadTasks()
     }
   }, [])
 
-  // Save API token
+  // Save token manually
   async function handleLoadTasks() {
     if (!token.trim()) {
       setError('Please enter your API token')
@@ -58,7 +66,55 @@ function App() {
     await loadTasks()
   }
 
-  // Create a new task
+  // Register a new user
+  async function handleRegister(event) {
+    event.preventDefault()
+
+    if (!username.trim() || !password) {
+      setError('Username and password are required')
+      return
+    }
+
+    setRegistering(true)
+    setError('')
+
+    try {
+      const userData = {
+        username: username.trim(),
+        firstname: firstname.trim(),
+        lastname: lastname.trim(),
+        newPassword: password
+      }
+
+      const result = await todoApi.register(userData)
+
+      if (!result?.access_token) {
+        throw new Error('Registration did not return a token')
+      }
+
+      sessionStorage.setItem(
+        'token',
+        result.access_token
+      )
+
+      setToken(result.access_token)
+      setTasks([])
+
+      setUsername('')
+      setFirstname('')
+      setLastname('')
+      setPassword('')
+      setShowRegister(false)
+
+      await loadTasks()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setRegistering(false)
+    }
+  }
+
+  // Create task
   async function handleAddTask(event) {
     event.preventDefault()
 
@@ -87,7 +143,7 @@ function App() {
     }
   }
 
-  // Toggle completed status
+  // Toggle checkbox
   async function handleToggleTask(task) {
     if (
       updatingId !== null ||
@@ -142,7 +198,7 @@ function App() {
 
     try {
       await todoApi.updateTask(editingId, {
-        title: title
+        title
       })
 
       await loadTasks()
@@ -155,7 +211,7 @@ function App() {
     }
   }
 
-  // Delete task from the server
+  // Delete task
   async function handleDeleteTask(task) {
     if (
       deletingId !== null ||
@@ -195,143 +251,239 @@ function App() {
     <div className="todo-container">
       <h1>My ToDo List</h1>
 
-      <div className="token-form">
-        <input
-          type="password"
-          placeholder="Enter your API token"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-        />
-
-        <button onClick={handleLoadTasks}>
-          Load Tasks
+      <div className="auth-switch">
+        <button
+          type="button"
+          onClick={() => {
+            setShowRegister(!showRegister)
+            setError('')
+          }}
+        >
+          {showRegister
+            ? 'Back to Tasks'
+            : 'Create Account'}
         </button>
       </div>
 
-      <form
-        className="todo-form"
-        onSubmit={handleAddTask}
-      >
-        <input
-          type="text"
-          placeholder="Enter a new task..."
-          value={newTask}
-          maxLength={255}
-          onChange={(e) => setNewTask(e.target.value)}
-        />
-
-        <button
-          type="submit"
-          disabled={adding || !newTask.trim()}
+      {showRegister ? (
+        <form
+          className="register-form"
+          onSubmit={handleRegister}
         >
-          {adding ? 'Adding...' : 'Add'}
-        </button>
-      </form>
+          <h2>Register</h2>
 
-      <p className="task-counter">
-        Completed: {completedCount} / {tasks.length}
-      </p>
+          <label htmlFor="username">Username</label>
+          <input
+            id="username"
+            type="text"
+            value={username}
+            maxLength={64}
+            required
+            onChange={(e) =>
+              setUsername(e.target.value)
+            }
+          />
 
-      {loading && <p>Loading tasks...</p>}
+          <label htmlFor="firstname">First name</label>
+          <input
+            id="firstname"
+            type="text"
+            value={firstname}
+            onChange={(e) =>
+              setFirstname(e.target.value)
+            }
+          />
 
-      {error && <p className="error">{error}</p>}
+          <label htmlFor="lastname">Last name</label>
+          <input
+            id="lastname"
+            type="text"
+            value={lastname}
+            onChange={(e) =>
+              setLastname(e.target.value)
+            }
+          />
 
-      {!loading && !error && tasks.length === 0 && (
-        <p>No tasks found.</p>
+          <label htmlFor="password">Password</label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            required
+            onChange={(e) =>
+              setPassword(e.target.value)
+            }
+          />
+
+          <button
+            type="submit"
+            disabled={
+              registering ||
+              !username.trim() ||
+              !password
+            }
+          >
+            {registering
+              ? 'Registering...'
+              : 'Register'}
+          </button>
+        </form>
+      ) : (
+        <>
+          <div className="token-form">
+            <input
+              type="password"
+              placeholder="Enter your API token"
+              value={token}
+              onChange={(e) =>
+                setToken(e.target.value)
+              }
+            />
+
+            <button onClick={handleLoadTasks}>
+              Load Tasks
+            </button>
+          </div>
+
+          <form
+            className="todo-form"
+            onSubmit={handleAddTask}
+          >
+            <input
+              type="text"
+              placeholder="Enter a new task..."
+              value={newTask}
+              maxLength={255}
+              onChange={(e) =>
+                setNewTask(e.target.value)
+              }
+            />
+
+            <button
+              type="submit"
+              disabled={adding || !newTask.trim()}
+            >
+              {adding ? 'Adding...' : 'Add'}
+            </button>
+          </form>
+
+          <p className="task-counter">
+            Completed: {completedCount} / {tasks.length}
+          </p>
+
+          {loading && <p>Loading tasks...</p>}
+
+          {!loading && !error && tasks.length === 0 && (
+            <p>No tasks found.</p>
+          )}
+
+          <div className="todo-list">
+            {tasks.map((task) => (
+              <div
+                className="todo-item"
+                key={task.id}
+              >
+                {editingId === task.id ? (
+                  <form
+                    className="edit-form"
+                    onSubmit={handleSaveEdit}
+                  >
+                    <input
+                      type="text"
+                      value={editTitle}
+                      maxLength={255}
+                      disabled={savingEdit}
+                      onChange={(e) =>
+                        setEditTitle(e.target.value)
+                      }
+                    />
+
+                    <button
+                      type="submit"
+                      className="save-btn"
+                      disabled={
+                        savingEdit || !editTitle.trim()
+                      }
+                    >
+                      {savingEdit ? 'Saving...' : 'Save'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="cancel-btn"
+                      disabled={savingEdit}
+                      onClick={handleCancelEdit}
+                    >
+                      Cancel
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(task.marked_as_done)}
+                      disabled={
+                        updatingId !== null ||
+                        deletingId !== null ||
+                        savingEdit ||
+                        loading
+                      }
+                      onChange={() =>
+                        handleToggleTask(task)
+                      }
+                    />
+
+                    <span
+                      className={
+                        task.marked_as_done
+                          ? 'completed'
+                          : ''
+                      }
+                    >
+                      {task.title}
+                    </span>
+
+                    <button
+                      className="edit-btn"
+                      disabled={
+                        editingId !== null ||
+                        updatingId !== null ||
+                        deletingId !== null ||
+                        loading
+                      }
+                      onClick={() =>
+                        handleStartEdit(task)
+                      }
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      className="delete-btn"
+                      disabled={
+                        deletingId !== null ||
+                        updatingId !== null ||
+                        savingEdit ||
+                        editingId !== null ||
+                        loading
+                      }
+                      onClick={() =>
+                        handleDeleteTask(task)
+                      }
+                    >
+                      {deletingId === task.id
+                        ? 'Deleting...'
+                        : 'Delete'}
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
-      <div className="todo-list">
-        {tasks.map((task) => (
-          <div className="todo-item" key={task.id}>
-            {editingId === task.id ? (
-              <form
-                className="edit-form"
-                onSubmit={handleSaveEdit}
-              >
-                <input
-                  type="text"
-                  value={editTitle}
-                  maxLength={255}
-                  disabled={savingEdit}
-                  onChange={(e) =>
-                    setEditTitle(e.target.value)
-                  }
-                />
-
-                <button
-                  type="submit"
-                  className="save-btn"
-                  disabled={
-                    savingEdit || !editTitle.trim()
-                  }
-                >
-                  {savingEdit ? 'Saving...' : 'Save'}
-                </button>
-
-                <button
-                  type="button"
-                  className="cancel-btn"
-                  disabled={savingEdit}
-                  onClick={handleCancelEdit}
-                >
-                  Cancel
-                </button>
-              </form>
-            ) : (
-              <>
-                <input
-                  type="checkbox"
-                  checked={Boolean(task.marked_as_done)}
-                  disabled={
-                    updatingId !== null ||
-                    deletingId !== null ||
-                    savingEdit ||
-                    loading
-                  }
-                  onChange={() => handleToggleTask(task)}
-                />
-
-                <span
-                  className={
-                    task.marked_as_done ? 'completed' : ''
-                  }
-                >
-                  {task.title}
-                </span>
-
-                <button
-                  className="edit-btn"
-                  disabled={
-                    editingId !== null ||
-                    updatingId !== null ||
-                    deletingId !== null ||
-                    loading
-                  }
-                  onClick={() => handleStartEdit(task)}
-                >
-                  Edit
-                </button>
-
-                <button
-                  className="delete-btn"
-                  disabled={
-                    deletingId !== null ||
-                    updatingId !== null ||
-                    savingEdit ||
-                    editingId !== null ||
-                    loading
-                  }
-                  onClick={() => handleDeleteTask(task)}
-                >
-                  {deletingId === task.id
-                    ? 'Deleting...'
-                    : 'Delete'}
-                </button>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
+      {error && <p className="error">{error}</p>}
     </div>
   )
 }
