@@ -16,12 +16,15 @@ function App() {
   const [updatingId, setUpdatingId] = useState(null)
   const [error, setError] = useState('')
 
-  // States for editing a task
+  // Editing states
   const [editingId, setEditingId] = useState(null)
   const [editTitle, setEditTitle] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
 
-  // Get all tasks from the server
+  // Deleting state
+  const [deletingId, setDeletingId] = useState(null)
+
+  // Get tasks from the server
   async function loadTasks() {
     setLoading(true)
     setError('')
@@ -44,7 +47,7 @@ function App() {
     }
   }, [])
 
-  // Save token and load tasks
+  // Save API token
   async function handleLoadTasks() {
     if (!token.trim()) {
       setError('Please enter your API token')
@@ -61,7 +64,7 @@ function App() {
 
     const title = newTask.trim()
 
-    if (!title) {
+    if (!title || adding) {
       return
     }
 
@@ -84,9 +87,14 @@ function App() {
     }
   }
 
-  // Mark task as completed or not completed
+  // Toggle completed status
   async function handleToggleTask(task) {
-    if (updatingId !== null || savingEdit || loading) {
+    if (
+      updatingId !== null ||
+      deletingId !== null ||
+      savingEdit ||
+      loading
+    ) {
       return
     }
 
@@ -106,7 +114,7 @@ function App() {
     }
   }
 
-  // Start editing a task
+  // Start editing
   function handleStartEdit(task) {
     setEditingId(task.id)
     setEditTitle(task.title)
@@ -119,7 +127,7 @@ function App() {
     setEditTitle('')
   }
 
-  // Save edited task to the server
+  // Save edited task
   async function handleSaveEdit(event) {
     event.preventDefault()
 
@@ -138,7 +146,6 @@ function App() {
       })
 
       await loadTasks()
-
       setEditingId(null)
       setEditTitle('')
     } catch (err) {
@@ -148,7 +155,38 @@ function App() {
     }
   }
 
-  // Count completed tasks
+  // Delete task from the server
+  async function handleDeleteTask(task) {
+    if (
+      deletingId !== null ||
+      updatingId !== null ||
+      savingEdit ||
+      loading
+    ) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${task.title}"?`
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setDeletingId(task.id)
+    setError('')
+
+    try {
+      await todoApi.deleteTask(task.id)
+      await loadTasks()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   const completedCount = tasks.filter(
     (task) => task.marked_as_done
   ).length
@@ -246,6 +284,7 @@ function App() {
                   checked={Boolean(task.marked_as_done)}
                   disabled={
                     updatingId !== null ||
+                    deletingId !== null ||
                     savingEdit ||
                     loading
                   }
@@ -265,6 +304,7 @@ function App() {
                   disabled={
                     editingId !== null ||
                     updatingId !== null ||
+                    deletingId !== null ||
                     loading
                   }
                   onClick={() => handleStartEdit(task)}
@@ -272,8 +312,20 @@ function App() {
                   Edit
                 </button>
 
-                <button className="delete-btn" disabled>
-                  Delete
+                <button
+                  className="delete-btn"
+                  disabled={
+                    deletingId !== null ||
+                    updatingId !== null ||
+                    savingEdit ||
+                    editingId !== null ||
+                    loading
+                  }
+                  onClick={() => handleDeleteTask(task)}
+                >
+                  {deletingId === task.id
+                    ? 'Deleting...'
+                    : 'Delete'}
                 </button>
               </>
             )}

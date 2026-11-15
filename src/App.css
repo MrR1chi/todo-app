@@ -179,3 +179,13 @@ button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+
+.delete-btn:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+.delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
