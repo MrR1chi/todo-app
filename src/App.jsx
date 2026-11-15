@@ -16,6 +16,12 @@ function App() {
   const [updatingId, setUpdatingId] = useState(null)
   const [error, setError] = useState('')
 
+  // States for editing a task
+  const [editingId, setEditingId] = useState(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  // Get all tasks from the server
   async function loadTasks() {
     setLoading(true)
     setError('')
@@ -31,12 +37,14 @@ function App() {
     }
   }
 
+  // Load tasks when the page opens
   useEffect(() => {
     if (sessionStorage.getItem('token')) {
       loadTasks()
     }
   }, [])
 
+  // Save token and load tasks
   async function handleLoadTasks() {
     if (!token.trim()) {
       setError('Please enter your API token')
@@ -47,6 +55,7 @@ function App() {
     await loadTasks()
   }
 
+  // Create a new task
   async function handleAddTask(event) {
     event.preventDefault()
 
@@ -75,8 +84,9 @@ function App() {
     }
   }
 
+  // Mark task as completed or not completed
   async function handleToggleTask(task) {
-    if (updatingId !== null) {
+    if (updatingId !== null || savingEdit || loading) {
       return
     }
 
@@ -96,6 +106,49 @@ function App() {
     }
   }
 
+  // Start editing a task
+  function handleStartEdit(task) {
+    setEditingId(task.id)
+    setEditTitle(task.title)
+    setError('')
+  }
+
+  // Cancel editing
+  function handleCancelEdit() {
+    setEditingId(null)
+    setEditTitle('')
+  }
+
+  // Save edited task to the server
+  async function handleSaveEdit(event) {
+    event.preventDefault()
+
+    const title = editTitle.trim()
+
+    if (!title || editingId === null || savingEdit) {
+      return
+    }
+
+    setSavingEdit(true)
+    setError('')
+
+    try {
+      await todoApi.updateTask(editingId, {
+        title: title
+      })
+
+      await loadTasks()
+
+      setEditingId(null)
+      setEditTitle('')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  // Count completed tasks
   const completedCount = tasks.filter(
     (task) => task.marked_as_done
   ).length
@@ -143,9 +196,7 @@ function App() {
 
       {loading && <p>Loading tasks...</p>}
 
-      {error && (
-        <p className="error">{error}</p>
-      )}
+      {error && <p className="error">{error}</p>}
 
       {!loading && !error && tasks.length === 0 && (
         <p>No tasks found.</p>
@@ -154,27 +205,78 @@ function App() {
       <div className="todo-list">
         {tasks.map((task) => (
           <div className="todo-item" key={task.id}>
-            <input
-              type="checkbox"
-              checked={Boolean(task.marked_as_done)}
-              disabled={updatingId !== null || loading}
-              onChange={() => handleToggleTask(task)}
-            />
+            {editingId === task.id ? (
+              <form
+                className="edit-form"
+                onSubmit={handleSaveEdit}
+              >
+                <input
+                  type="text"
+                  value={editTitle}
+                  maxLength={255}
+                  disabled={savingEdit}
+                  onChange={(e) =>
+                    setEditTitle(e.target.value)
+                  }
+                />
 
-            <span
-              className={
-                task.marked_as_done ? 'completed' : ''
-              }
-            >
-              {task.title}
-            </span>
+                <button
+                  type="submit"
+                  className="save-btn"
+                  disabled={
+                    savingEdit || !editTitle.trim()
+                  }
+                >
+                  {savingEdit ? 'Saving...' : 'Save'}
+                </button>
 
-            <button
-              className="delete-btn"
-              disabled
-            >
-              Delete
-            </button>
+                <button
+                  type="button"
+                  className="cancel-btn"
+                  disabled={savingEdit}
+                  onClick={handleCancelEdit}
+                >
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <>
+                <input
+                  type="checkbox"
+                  checked={Boolean(task.marked_as_done)}
+                  disabled={
+                    updatingId !== null ||
+                    savingEdit ||
+                    loading
+                  }
+                  onChange={() => handleToggleTask(task)}
+                />
+
+                <span
+                  className={
+                    task.marked_as_done ? 'completed' : ''
+                  }
+                >
+                  {task.title}
+                </span>
+
+                <button
+                  className="edit-btn"
+                  disabled={
+                    editingId !== null ||
+                    updatingId !== null ||
+                    loading
+                  }
+                  onClick={() => handleStartEdit(task)}
+                >
+                  Edit
+                </button>
+
+                <button className="delete-btn" disabled>
+                  Delete
+                </button>
+              </>
+            )}
           </div>
         ))}
       </div>
