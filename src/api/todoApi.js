@@ -1,7 +1,6 @@
 
 const API_URL = 'https://demo2.z-bit.ee'
 
-// Universal function for HTTP requests
 async function apiRequest(
   endpoint,
   method = 'GET',
@@ -12,7 +11,6 @@ async function apiRequest(
     'Content-Type': 'application/json'
   }
 
-  // Add token only for protected requests
   if (requiresAuth) {
     const token = sessionStorage.getItem('token')
 
@@ -36,20 +34,32 @@ async function apiRequest(
   )
 
   const text = await response.text()
-  const result = text ? JSON.parse(text) : null
+
+  let result = null
+
+  if (text) {
+    try {
+      result = JSON.parse(text)
+    } catch {
+      throw new Error('Invalid server response')
+    }
+  }
 
   if (!response.ok) {
-    throw new Error(
+    const error = new Error(
       result?.message ||
       `Request failed: ${response.status}`
     )
+
+    error.status = response.status
+
+    throw error
   }
 
   return result
 }
 
 export const todoApi = {
-  // Tasks
   getTasks: () =>
     apiRequest('/tasks'),
 
@@ -65,7 +75,6 @@ export const todoApi = {
   deleteTask: (id) =>
     apiRequest(`/tasks/${id}`, 'DELETE'),
 
-  // Authentication
   register: (userData) =>
     apiRequest('/users', 'POST', userData, false),
 

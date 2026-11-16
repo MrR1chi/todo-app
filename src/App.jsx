@@ -5,11 +5,13 @@ import './App.css'
 
 function App() {
   // Authentication
-  const [isLoggedIn, setIsLoggedIn] = useState(
-    Boolean(sessionStorage.getItem('token'))
+  const [sessionStatus, setSessionStatus] = useState(
+    sessionStorage.getItem('token')
+      ? 'checking'
+      : 'guest'
   )
 
-  const [view, setView] = useState('tasks')
+  const [view, setView] = useState('login')
   const [error, setError] = useState('')
   const sessionVersion = useRef(0)
 
@@ -40,6 +42,8 @@ function App() {
   const [loginPassword, setLoginPassword] = useState('')
   const [loggingIn, setLoggingIn] = useState(false)
 
+  const isLoggedIn = sessionStatus === 'authenticated'
+
   const busy =
     loading ||
     adding ||
@@ -47,23 +51,62 @@ function App() {
     savingEdit ||
     deletingId !== null
 
-  // Get tasks from the API
-  async function loadTasks() {
+  // Clear local authentication
+  function clearSession() {
+    sessionVersion.current += 1
+
+    sessionStorage.removeItem('token')
+    setSessionStatus('guest')
+
+    setTasks([])
+    setNewTask('')
+    setEditingId(null)
+    setEditTitle('')
+    setView('login')
+  }
+
+  // Handle server errors
+  function handleApiError(err) {
+    if (err.status === 401) {
+      clearSession()
+      setError('Session expired. Please login again.')
+    } else {
+      setError(err.message)
+    }
+  }
+
+  // Get tasks and validate the current session
+  async function loadTasks(verifySession = false) {
     const currentSession = sessionVersion.current
 
     setLoading(true)
     setError('')
 
+    if (verifySession) {
+      setSessionStatus('checking')
+    }
+
     try {
       const data = await todoApi.getTasks()
 
-      if (currentSession === sessionVersion.current) {
-        setTasks(data)
+      if (currentSession !== sessionVersion.current) {
+        return
       }
+
+      setTasks(data)
+      setSessionStatus('authenticated')
     } catch (err) {
-      if (currentSession === sessionVersion.current) {
+      if (currentSession !== sessionVersion.current) {
+        return
+      }
+
+      if (err.status === 401) {
+        handleApiError(err)
+      } else if (verifySession) {
+        setSessionStatus('unverified')
         setError(err.message)
-        setTasks([])
+      } else {
+        setError(err.message)
       }
     } finally {
       if (currentSession === sessionVersion.current) {
@@ -72,35 +115,29 @@ function App() {
     }
   }
 
-  // Load tasks when opening the application
+  // Restore the session when the page opens
   useEffect(() => {
     if (sessionStorage.getItem('token')) {
-      loadTasks()
+      loadTasks(true)
     }
   }, [])
 
   // Navigation
-  function openRegister() {
-    setView('register')
-    setError('')
-  }
-
   function openLogin() {
     setView('login')
     setError('')
   }
 
-  function openTasks() {
-    setView('tasks')
+  function openRegister() {
+    setView('register')
     setError('')
   }
 
-  // Register a user
+  // Register
   async function handleRegister(event) {
     event.preventDefault()
 
-    if (!username.trim() || !password) {
-      setError('Username and password are required')
+    if (!username.trim() || !password || registering) {
       return
     }
 
@@ -122,18 +159,18 @@ function App() {
       }
 
       sessionVersion.current += 1
-
       sessionStorage.setItem('token', result.access_token)
-      setIsLoggedIn(true)
+
       setTasks([])
+      setNewTask('')
+      setPassword('')
 
       setUsername('')
       setFirstname('')
       setLastname('')
-      setPassword('')
+      setView('login')
 
-      openTasks()
-      await loadTasks()
+      await loadTasks(true)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -141,12 +178,15 @@ function App() {
     }
   }
 
-  // Login to an existing account
+  // Login
   async function handleLogin(event) {
     event.preventDefault()
 
-    if (!loginUsername.trim() || !loginPassword) {
-      setError('Please enter username and password')
+    if (
+      !loginUsername.trim() ||
+      !loginPassword ||
+      loggingIn
+    ) {
       return
     }
 
@@ -164,10 +204,8 @@ function App() {
       }
 
       sessionVersion.current += 1
-
       sessionStorage.setItem('token', result.access_token)
 
-      setIsLoggedIn(true)
       setTasks([])
       setNewTask('')
       setEditingId(null)
@@ -176,8 +214,7 @@ function App() {
       setLoginUsername('')
       setLoginPassword('')
 
-      openTasks()
-      await loadTasks()
+      await loadTasks(true)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -185,37 +222,21 @@ function App() {
     }
   }
 
-  // Logout from the current account
+  // Logout
   function handleLogout() {
-    if (busy || registering || loggingIn) {
+    if (busy) {
       return
     }
 
-    sessionVersion.current += 1
+    clearSession()
 
-    // Remove authentication token
-    sessionStorage.removeItem('token')
-
-    // Reset authentication
-    setIsLoggedIn(false)
-
-    // Clear previous user's data
-    setTasks([])
-    setNewTask('')
-    setEditingId(null)
-    setEditTitle('')
     setError('')
-
-    // Clear forms
     setLoginUsername('')
     setLoginPassword('')
     setUsername('')
     setFirstname('')
     setLastname('')
     setPassword('')
-
-    // Show login screen
-    setView('login')
   }
 
   // Create task
@@ -224,7 +245,7 @@ function App() {
 
     const title = newTask.trim()
 
-    if (!title || adding || !isLoggedIn) {
+    if (!title || busy || !isLoggedIn) {
       return
     }
 
@@ -236,13 +257,13 @@ function App() {
       setNewTask('')
       await loadTasks()
     } catch (err) {
-      setError(err.message)
+      handleApiError(err)
     } finally {
       setAdding(false)
     }
   }
 
-  // Mark task as completed or incomplete
+  // Toggle checkbox
   async function handleToggleTask(task) {
     if (busy || !isLoggedIn) {
       return
@@ -258,7 +279,7 @@ function App() {
 
       await loadTasks()
     } catch (err) {
-      setError(err.message)
+      handleApiError(err)
     } finally {
       setUpdatingId(null)
     }
@@ -296,13 +317,14 @@ function App() {
 
     try {
       await todoApi.updateTask(editingId, { title })
-
       await loadTasks()
 
-      setEditingId(null)
-      setEditTitle('')
+      if (sessionStorage.getItem('token')) {
+        setEditingId(null)
+        setEditTitle('')
+      }
     } catch (err) {
-      setError(err.message)
+      handleApiError(err)
     } finally {
       setSavingEdit(false)
     }
@@ -329,13 +351,12 @@ function App() {
       await todoApi.deleteTask(task.id)
       await loadTasks()
     } catch (err) {
-      setError(err.message)
+      handleApiError(err)
     } finally {
       setDeletingId(null)
     }
   }
 
-  // Number of completed tasks
   const completedCount = tasks.filter(
     (task) => task.marked_as_done
   ).length
@@ -344,45 +365,69 @@ function App() {
     <div className="todo-container">
       <h1>My ToDo List</h1>
 
-      <div className="auth-switch">
-        {isLoggedIn ? (
-          <>
-            <button
-              type="button"
-              onClick={openTasks}
-            >
-              Tasks
-            </button>
+      {isLoggedIn ? (
+        <div className="auth-switch">
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={busy}
+            className="logout-btn"
+          >
+            Logout
+          </button>
+        </div>
+      ) : sessionStatus === 'guest' ? (
+        <div className="auth-switch">
+          <button
+            type="button"
+            onClick={openLogin}
+          >
+            Login
+          </button>
 
-            <button
-              type="button"
-              className="logout-btn"
-              onClick={handleLogout}
-              disabled={busy}
-            >
-              Logout
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={openLogin}
-            >
-              Login
-            </button>
+          <button
+            type="button"
+            onClick={openRegister}
+          >
+            Register
+          </button>
+        </div>
+      ) : null}
 
-            <button
-              type="button"
-              onClick={openRegister}
-            >
-              Register
-            </button>
-          </>
-        )}
-      </div>
+      {sessionStatus === 'checking' && (
+        <div className="session-message">
+          <h2>Checking your session...</h2>
+          <p>Please wait while we load your tasks.</p>
+        </div>
+      )}
 
-      {!isLoggedIn && view === 'login' && (
+      {sessionStatus === 'unverified' && (
+        <div className="session-message">
+          <h2>Connection problem</h2>
+          <p>
+            We could not verify your session.
+            Your token is still saved.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => loadTasks(true)}
+            disabled={loading}
+          >
+            Retry
+          </button>
+
+          <button
+            type="button"
+            className="cancel-btn"
+            onClick={handleLogout}
+          >
+            Back to Login
+          </button>
+        </div>
+      )}
+
+      {sessionStatus === 'guest' && view === 'login' && (
         <form
           className="login-form"
           onSubmit={handleLogin}
@@ -392,6 +437,7 @@ function App() {
           <label htmlFor="loginUsername">
             Username
           </label>
+
           <input
             id="loginUsername"
             type="text"
@@ -406,6 +452,7 @@ function App() {
           <label htmlFor="loginPassword">
             Password
           </label>
+
           <input
             id="loginPassword"
             type="password"
@@ -440,19 +487,21 @@ function App() {
         </form>
       )}
 
-      {!isLoggedIn && view === 'register' && (
+      {sessionStatus === 'guest' && view === 'register' && (
         <form
           className="register-form"
           onSubmit={handleRegister}
         >
-          <h2>Register</h2>
+          <h2>Create Account</h2>
 
-          <label htmlFor="username">Username</label>
+          <label htmlFor="username">
+            Username
+          </label>
           <input
             id="username"
             type="text"
-            value={username}
             maxLength={64}
+            value={username}
             required
             onChange={(e) =>
               setUsername(e.target.value)
@@ -504,21 +553,9 @@ function App() {
               !password
             }
           >
-            {registering
-              ? 'Registering...'
-              : 'Register'}
+            {registering ? 'Registering...' : 'Register'}
           </button>
         </form>
-      )}
-
-      {!isLoggedIn && view === 'tasks' && (
-        <div className="guest-message">
-          <h2>Welcome!</h2>
-          <p>
-            Please login or register to manage your tasks.
-          </p>
-          <button onClick={openLogin}>Login</button>
-        </div>
       )}
 
       {isLoggedIn && (
@@ -529,9 +566,9 @@ function App() {
           >
             <input
               type="text"
-              placeholder="Enter a new task..."
               value={newTask}
               maxLength={255}
+              placeholder="Enter a new task..."
               onChange={(e) =>
                 setNewTask(e.target.value)
               }

@@ -19,3 +19,45 @@ button {
 button:hover {
   opacity: 0.9;
 }
+
+
+/* Session status screens */
+.session-message {
+  padding: 35px 20px;
+  text-align: center;
+}
+
+.session-message h2 {
+  margin-bottom: 12px;
+  font-size: 22px;
+}
+
+.session-message p {
+  color: #6b7280;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.session-message button {
+  padding: 11px 20px;
+  margin: 5px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.session-message button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.session-message .cancel-btn {
+  background: #6b7280;
+}
+
+.session-message button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
