@@ -1,20 +1,24 @@
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { todoApi } from './api/todoApi'
 import './App.css'
 
 function App() {
-  // Tasks
-  const [tasks, setTasks] = useState([])
-  const [token, setToken] = useState(
-    sessionStorage.getItem('token') || ''
+  // Authentication
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    Boolean(sessionStorage.getItem('token'))
   )
 
+  const [view, setView] = useState('tasks')
+  const [error, setError] = useState('')
+  const sessionVersion = useRef(0)
+
+  // Tasks
+  const [tasks, setTasks] = useState([])
   const [newTask, setNewTask] = useState('')
   const [loading, setLoading] = useState(false)
   const [adding, setAdding] = useState(false)
   const [updatingId, setUpdatingId] = useState(null)
-  const [error, setError] = useState('')
 
   // Editing
   const [editingId, setEditingId] = useState(null)
@@ -25,7 +29,6 @@ function App() {
   const [deletingId, setDeletingId] = useState(null)
 
   // Registration
-  const [showRegister, setShowRegister] = useState(false)
   const [username, setUsername] = useState('')
   const [firstname, setFirstname] = useState('')
   const [lastname, setLastname] = useState('')
@@ -33,66 +36,66 @@ function App() {
   const [registering, setRegistering] = useState(false)
 
   // Login
-  const [showLogin, setShowLogin] = useState(false)
   const [loginUsername, setLoginUsername] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   const [loggingIn, setLoggingIn] = useState(false)
 
-  // Get tasks from the server
+  const busy =
+    loading ||
+    adding ||
+    updatingId !== null ||
+    savingEdit ||
+    deletingId !== null
+
+  // Get tasks from the API
   async function loadTasks() {
+    const currentSession = sessionVersion.current
+
     setLoading(true)
     setError('')
 
     try {
       const data = await todoApi.getTasks()
-      setTasks(data)
+
+      if (currentSession === sessionVersion.current) {
+        setTasks(data)
+      }
     } catch (err) {
-      setError(err.message)
-      setTasks([])
+      if (currentSession === sessionVersion.current) {
+        setError(err.message)
+        setTasks([])
+      }
     } finally {
-      setLoading(false)
+      if (currentSession === sessionVersion.current) {
+        setLoading(false)
+      }
     }
   }
 
-  // Automatically load tasks if token exists
+  // Load tasks when opening the application
   useEffect(() => {
     if (sessionStorage.getItem('token')) {
       loadTasks()
     }
   }, [])
 
-  // Save token manually (temporary feature)
-  async function handleLoadTasks() {
-    if (!token.trim()) {
-      setError('Please enter your API token')
-      return
-    }
-
-    sessionStorage.setItem('token', token.trim())
-    setTasks([])
-    await loadTasks()
-  }
-
-  // Switch between pages
+  // Navigation
   function openRegister() {
-    setShowRegister(true)
-    setShowLogin(false)
+    setView('register')
     setError('')
   }
 
   function openLogin() {
-    setShowLogin(true)
-    setShowRegister(false)
+    setView('login')
     setError('')
   }
 
   function openTasks() {
-    setShowRegister(false)
-    setShowLogin(false)
+    setView('tasks')
     setError('')
   }
 
-  // Register new user
+  // Register a user
   async function handleRegister(event) {
     event.preventDefault()
 
@@ -115,17 +118,13 @@ function App() {
       const result = await todoApi.register(userData)
 
       if (!result?.access_token) {
-        throw new Error(
-          'Registration did not return a token'
-        )
+        throw new Error('Registration did not return a token')
       }
 
-      sessionStorage.setItem(
-        'token',
-        result.access_token
-      )
+      sessionVersion.current += 1
 
-      setToken(result.access_token)
+      sessionStorage.setItem('token', result.access_token)
+      setIsLoggedIn(true)
       setTasks([])
 
       setUsername('')
@@ -142,13 +141,11 @@ function App() {
     }
   }
 
-  // Login to existing account
+  // Login to an existing account
   async function handleLogin(event) {
     event.preventDefault()
 
-    const usernameValue = loginUsername.trim()
-
-    if (!usernameValue || !loginPassword) {
+    if (!loginUsername.trim() || !loginPassword) {
       setError('Please enter username and password')
       return
     }
@@ -158,7 +155,7 @@ function App() {
 
     try {
       const result = await todoApi.login(
-        usernameValue,
+        loginUsername.trim(),
         loginPassword
       )
 
@@ -166,27 +163,20 @@ function App() {
         throw new Error('Login did not return a token')
       }
 
-      // Save token of the logged-in user
-      sessionStorage.setItem(
-        'token',
-        result.access_token
-      )
+      sessionVersion.current += 1
 
-      setToken(result.access_token)
+      sessionStorage.setItem('token', result.access_token)
 
-      // Clear tasks from previous account
+      setIsLoggedIn(true)
       setTasks([])
       setNewTask('')
       setEditingId(null)
       setEditTitle('')
 
-      // Clear login form
       setLoginUsername('')
       setLoginPassword('')
 
       openTasks()
-
-      // Load tasks of the logged-in user
       await loadTasks()
     } catch (err) {
       setError(err.message)
@@ -195,18 +185,46 @@ function App() {
     }
   }
 
+  // Logout from the current account
+  function handleLogout() {
+    if (busy || registering || loggingIn) {
+      return
+    }
+
+    sessionVersion.current += 1
+
+    // Remove authentication token
+    sessionStorage.removeItem('token')
+
+    // Reset authentication
+    setIsLoggedIn(false)
+
+    // Clear previous user's data
+    setTasks([])
+    setNewTask('')
+    setEditingId(null)
+    setEditTitle('')
+    setError('')
+
+    // Clear forms
+    setLoginUsername('')
+    setLoginPassword('')
+    setUsername('')
+    setFirstname('')
+    setLastname('')
+    setPassword('')
+
+    // Show login screen
+    setView('login')
+  }
+
   // Create task
   async function handleAddTask(event) {
     event.preventDefault()
 
     const title = newTask.trim()
 
-    if (!title || adding) {
-      return
-    }
-
-    if (!sessionStorage.getItem('token')) {
-      setError('Please login first')
+    if (!title || adding || !isLoggedIn) {
       return
     }
 
@@ -224,14 +242,9 @@ function App() {
     }
   }
 
-  // Toggle checkbox
+  // Mark task as completed or incomplete
   async function handleToggleTask(task) {
-    if (
-      updatingId !== null ||
-      deletingId !== null ||
-      savingEdit ||
-      loading
-    ) {
+    if (busy || !isLoggedIn) {
       return
     }
 
@@ -253,6 +266,10 @@ function App() {
 
   // Start editing
   function handleStartEdit(task) {
+    if (busy) {
+      return
+    }
+
     setEditingId(task.id)
     setEditTitle(task.title)
     setError('')
@@ -270,7 +287,7 @@ function App() {
 
     const title = editTitle.trim()
 
-    if (!title || editingId === null || savingEdit) {
+    if (!title || editingId === null || busy) {
       return
     }
 
@@ -278,11 +295,10 @@ function App() {
     setError('')
 
     try {
-      await todoApi.updateTask(editingId, {
-        title
-      })
+      await todoApi.updateTask(editingId, { title })
 
       await loadTasks()
+
       setEditingId(null)
       setEditTitle('')
     } catch (err) {
@@ -294,12 +310,7 @@ function App() {
 
   // Delete task
   async function handleDeleteTask(task) {
-    if (
-      deletingId !== null ||
-      updatingId !== null ||
-      savingEdit ||
-      loading
-    ) {
+    if (busy || editingId !== null) {
       return
     }
 
@@ -324,6 +335,7 @@ function App() {
     }
   }
 
+  // Number of completed tasks
   const completedCount = tasks.filter(
     (task) => task.marked_as_done
   ).length
@@ -333,29 +345,44 @@ function App() {
       <h1>My ToDo List</h1>
 
       <div className="auth-switch">
-        <button
-          type="button"
-          onClick={openTasks}
-        >
-          Tasks
-        </button>
+        {isLoggedIn ? (
+          <>
+            <button
+              type="button"
+              onClick={openTasks}
+            >
+              Tasks
+            </button>
 
-        <button
-          type="button"
-          onClick={openLogin}
-        >
-          Login
-        </button>
+            <button
+              type="button"
+              className="logout-btn"
+              onClick={handleLogout}
+              disabled={busy}
+            >
+              Logout
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={openLogin}
+            >
+              Login
+            </button>
 
-        <button
-          type="button"
-          onClick={openRegister}
-        >
-          Register
-        </button>
+            <button
+              type="button"
+              onClick={openRegister}
+            >
+              Register
+            </button>
+          </>
+        )}
       </div>
 
-      {showLogin ? (
+      {!isLoggedIn && view === 'login' && (
         <form
           className="login-form"
           onSubmit={handleLogin}
@@ -411,7 +438,9 @@ function App() {
             </button>
           </p>
         </form>
-      ) : showRegister ? (
+      )}
+
+      {!isLoggedIn && view === 'register' && (
         <form
           className="register-form"
           onSubmit={handleRegister}
@@ -480,23 +509,20 @@ function App() {
               : 'Register'}
           </button>
         </form>
-      ) : (
+      )}
+
+      {!isLoggedIn && view === 'tasks' && (
+        <div className="guest-message">
+          <h2>Welcome!</h2>
+          <p>
+            Please login or register to manage your tasks.
+          </p>
+          <button onClick={openLogin}>Login</button>
+        </div>
+      )}
+
+      {isLoggedIn && (
         <>
-          <div className="token-form">
-            <input
-              type="password"
-              placeholder="Enter your API token"
-              value={token}
-              onChange={(e) =>
-                setToken(e.target.value)
-              }
-            />
-
-            <button onClick={handleLoadTasks}>
-              Load Tasks
-            </button>
-          </div>
-
           <form
             className="todo-form"
             onSubmit={handleAddTask}
@@ -513,7 +539,7 @@ function App() {
 
             <button
               type="submit"
-              disabled={adding || !newTask.trim()}
+              disabled={busy || !newTask.trim()}
             >
               {adding ? 'Adding...' : 'Add'}
             </button>
@@ -557,9 +583,7 @@ function App() {
                         savingEdit || !editTitle.trim()
                       }
                     >
-                      {savingEdit
-                        ? 'Saving...'
-                        : 'Save'}
+                      {savingEdit ? 'Saving...' : 'Save'}
                     </button>
 
                     <button
@@ -578,12 +602,7 @@ function App() {
                       checked={Boolean(
                         task.marked_as_done
                       )}
-                      disabled={
-                        updatingId !== null ||
-                        deletingId !== null ||
-                        savingEdit ||
-                        loading
-                      }
+                      disabled={busy}
                       onChange={() =>
                         handleToggleTask(task)
                       }
@@ -600,12 +619,10 @@ function App() {
                     </span>
 
                     <button
+                      type="button"
                       className="edit-btn"
                       disabled={
-                        editingId !== null ||
-                        updatingId !== null ||
-                        deletingId !== null ||
-                        loading
+                        busy || editingId !== null
                       }
                       onClick={() =>
                         handleStartEdit(task)
@@ -615,13 +632,10 @@ function App() {
                     </button>
 
                     <button
+                      type="button"
                       className="delete-btn"
                       disabled={
-                        deletingId !== null ||
-                        updatingId !== null ||
-                        savingEdit ||
-                        editingId !== null ||
-                        loading
+                        busy || editingId !== null
                       }
                       onClick={() =>
                         handleDeleteTask(task)

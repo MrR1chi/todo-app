@@ -323,3 +323,62 @@ button:disabled {
   text-decoration: underline;
 }
 
+
+/* Logout button */
+.logout-btn {
+  padding: 10px 20px;
+  background: #dc2626 !important;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.logout-btn:hover:not(:disabled) {
+  background: #b91c1c !important;
+}
+
+.logout-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Welcome screen */
+.guest-message {
+  padding: 30px 15px;
+  text-align: center;
+}
+
+.guest-message h2 {
+  margin-bottom: 12px;
+}
+
+.guest-message p {
+  color: #6b7280;
+  margin-bottom: 20px;
+}
+
+.guest-message button {
+  padding: 12px 24px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Smaller screens */
+@media (max-width: 540px) {
+  .todo-container {
+    padding: 18px;
+  }
+
+  .todo-item {
+    flex-wrap: wrap;
+  }
+
+  .edit-form {
+    flex-wrap: wrap;
+  }
+}
+
