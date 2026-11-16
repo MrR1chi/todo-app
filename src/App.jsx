@@ -4,8 +4,8 @@ import { todoApi } from './api/todoApi'
 import './App.css'
 
 function App() {
+  // Tasks
   const [tasks, setTasks] = useState([])
-
   const [token, setToken] = useState(
     sessionStorage.getItem('token') || ''
   )
@@ -32,7 +32,13 @@ function App() {
   const [password, setPassword] = useState('')
   const [registering, setRegistering] = useState(false)
 
-  // Get tasks from API
+  // Login
+  const [showLogin, setShowLogin] = useState(false)
+  const [loginUsername, setLoginUsername] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loggingIn, setLoggingIn] = useState(false)
+
+  // Get tasks from the server
   async function loadTasks() {
     setLoading(true)
     setError('')
@@ -48,14 +54,14 @@ function App() {
     }
   }
 
-  // Load tasks on page opening
+  // Automatically load tasks if token exists
   useEffect(() => {
     if (sessionStorage.getItem('token')) {
       loadTasks()
     }
   }, [])
 
-  // Save token manually
+  // Save token manually (temporary feature)
   async function handleLoadTasks() {
     if (!token.trim()) {
       setError('Please enter your API token')
@@ -63,10 +69,30 @@ function App() {
     }
 
     sessionStorage.setItem('token', token.trim())
+    setTasks([])
     await loadTasks()
   }
 
-  // Register a new user
+  // Switch between pages
+  function openRegister() {
+    setShowRegister(true)
+    setShowLogin(false)
+    setError('')
+  }
+
+  function openLogin() {
+    setShowLogin(true)
+    setShowRegister(false)
+    setError('')
+  }
+
+  function openTasks() {
+    setShowRegister(false)
+    setShowLogin(false)
+    setError('')
+  }
+
+  // Register new user
   async function handleRegister(event) {
     event.preventDefault()
 
@@ -89,7 +115,9 @@ function App() {
       const result = await todoApi.register(userData)
 
       if (!result?.access_token) {
-        throw new Error('Registration did not return a token')
+        throw new Error(
+          'Registration did not return a token'
+        )
       }
 
       sessionStorage.setItem(
@@ -104,13 +132,66 @@ function App() {
       setFirstname('')
       setLastname('')
       setPassword('')
-      setShowRegister(false)
 
+      openTasks()
       await loadTasks()
     } catch (err) {
       setError(err.message)
     } finally {
       setRegistering(false)
+    }
+  }
+
+  // Login to existing account
+  async function handleLogin(event) {
+    event.preventDefault()
+
+    const usernameValue = loginUsername.trim()
+
+    if (!usernameValue || !loginPassword) {
+      setError('Please enter username and password')
+      return
+    }
+
+    setLoggingIn(true)
+    setError('')
+
+    try {
+      const result = await todoApi.login(
+        usernameValue,
+        loginPassword
+      )
+
+      if (!result?.access_token) {
+        throw new Error('Login did not return a token')
+      }
+
+      // Save token of the logged-in user
+      sessionStorage.setItem(
+        'token',
+        result.access_token
+      )
+
+      setToken(result.access_token)
+
+      // Clear tasks from previous account
+      setTasks([])
+      setNewTask('')
+      setEditingId(null)
+      setEditTitle('')
+
+      // Clear login form
+      setLoginUsername('')
+      setLoginPassword('')
+
+      openTasks()
+
+      // Load tasks of the logged-in user
+      await loadTasks()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoggingIn(false)
     }
   }
 
@@ -125,7 +206,7 @@ function App() {
     }
 
     if (!sessionStorage.getItem('token')) {
-      setError('Please enter your API token first')
+      setError('Please login first')
       return
     }
 
@@ -254,18 +335,83 @@ function App() {
       <div className="auth-switch">
         <button
           type="button"
-          onClick={() => {
-            setShowRegister(!showRegister)
-            setError('')
-          }}
+          onClick={openTasks}
         >
-          {showRegister
-            ? 'Back to Tasks'
-            : 'Create Account'}
+          Tasks
+        </button>
+
+        <button
+          type="button"
+          onClick={openLogin}
+        >
+          Login
+        </button>
+
+        <button
+          type="button"
+          onClick={openRegister}
+        >
+          Register
         </button>
       </div>
 
-      {showRegister ? (
+      {showLogin ? (
+        <form
+          className="login-form"
+          onSubmit={handleLogin}
+        >
+          <h2>Login</h2>
+
+          <label htmlFor="loginUsername">
+            Username
+          </label>
+          <input
+            id="loginUsername"
+            type="text"
+            value={loginUsername}
+            maxLength={64}
+            required
+            onChange={(e) =>
+              setLoginUsername(e.target.value)
+            }
+          />
+
+          <label htmlFor="loginPassword">
+            Password
+          </label>
+          <input
+            id="loginPassword"
+            type="password"
+            value={loginPassword}
+            required
+            onChange={(e) =>
+              setLoginPassword(e.target.value)
+            }
+          />
+
+          <button
+            type="submit"
+            disabled={
+              loggingIn ||
+              !loginUsername.trim() ||
+              !loginPassword
+            }
+          >
+            {loggingIn ? 'Logging in...' : 'Login'}
+          </button>
+
+          <p>
+            Don't have an account?{' '}
+            <button
+              type="button"
+              className="text-btn"
+              onClick={openRegister}
+            >
+              Register
+            </button>
+          </p>
+        </form>
+      ) : showRegister ? (
         <form
           className="register-form"
           onSubmit={handleRegister}
@@ -284,7 +430,9 @@ function App() {
             }
           />
 
-          <label htmlFor="firstname">First name</label>
+          <label htmlFor="firstname">
+            First name
+          </label>
           <input
             id="firstname"
             type="text"
@@ -294,7 +442,9 @@ function App() {
             }
           />
 
-          <label htmlFor="lastname">Last name</label>
+          <label htmlFor="lastname">
+            Last name
+          </label>
           <input
             id="lastname"
             type="text"
@@ -304,7 +454,9 @@ function App() {
             }
           />
 
-          <label htmlFor="password">Password</label>
+          <label htmlFor="password">
+            Password
+          </label>
           <input
             id="password"
             type="password"
@@ -405,7 +557,9 @@ function App() {
                         savingEdit || !editTitle.trim()
                       }
                     >
-                      {savingEdit ? 'Saving...' : 'Save'}
+                      {savingEdit
+                        ? 'Saving...'
+                        : 'Save'}
                     </button>
 
                     <button
@@ -421,7 +575,9 @@ function App() {
                   <>
                     <input
                       type="checkbox"
-                      checked={Boolean(task.marked_as_done)}
+                      checked={Boolean(
+                        task.marked_as_done
+                      )}
                       disabled={
                         updatingId !== null ||
                         deletingId !== null ||
