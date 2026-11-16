@@ -1,63 +1,287 @@
 
-* {
-  box-sizing: border-box;
+.todo-container {
+  width: 650px;
+  max-width: 94%;
+  margin: 60px auto;
+  padding: 30px;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.08);
 }
 
-body {
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.app-header h1 {
   margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  background: #f3f4f6;
-  font-family: Arial, sans-serif;
-  color: #222;
+  font-size: 28px;
 }
 
 button {
-  font-family: inherit;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 15px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.2s;
 }
 
-button:hover {
-  opacity: 0.9;
+button:hover:not(:disabled) {
+  opacity: 0.85;
 }
 
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
-/* Session status screens */
-.session-message {
-  padding: 35px 20px;
+input[type="text"],
+input[type="password"] {
+  padding: 11px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+input:focus-visible,
+button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* Authentication */
+
+.auth-switch {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.auth-switch button {
+  flex: 1;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.auth-switch .active-tab {
+  background: #2563eb;
+  color: white;
+}
+
+.login-form,
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.login-form h2,
+.register-form h2 {
   text-align: center;
+  margin-bottom: 10px;
 }
 
-.session-message h2 {
+.login-form label,
+.register-form label {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.login-form button[type="submit"],
+.register-form button[type="submit"] {
+  margin-top: 10px;
+  background: #2563eb;
+  color: white;
+}
+
+.logout-btn {
+  background: #dc2626;
+  color: white;
+}
+
+/* Task creation */
+
+.todo-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.todo-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.todo-form button,
+.save-btn {
+  background: #2563eb;
+  color: white;
+}
+
+/* Progress */
+
+.progress-section {
   margin-bottom: 12px;
-  font-size: 22px;
+}
+
+.task-counter {
+  color: #6b7280;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.progress-track {
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #16a34a;
+  transition: width 0.3s;
+}
+
+.refresh-btn {
+  background: #f3f4f6;
+  color: #374151;
+  margin: 12px 0;
+}
+
+/* Task list */
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.todo-item span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.todo-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #16a34a;
+  cursor: pointer;
+}
+
+.completed {
+  text-decoration: line-through;
+  color: #9ca3af;
+}
+
+.edit-btn {
+  background: #f59e0b;
+  color: white;
+}
+
+.delete-btn {
+  background: #ef4444;
+  color: white;
+}
+
+.edit-form {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.edit-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.cancel-btn {
+  background: #6b7280;
+  color: white;
+}
+
+/* Messages */
+
+.error,
+.success-message {
+  padding: 12px;
+  border-radius: 6px;
+  margin-top: 15px;
+  font-size: 14px;
+}
+
+.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.success-message {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.empty-message {
+  text-align: center;
+  padding: 25px;
+  color: #6b7280;
+}
+
+.session-message {
+  text-align: center;
+  padding: 30px 10px;
 }
 
 .session-message p {
   color: #6b7280;
-  line-height: 1.5;
-  margin-bottom: 20px;
 }
 
 .session-message button {
-  padding: 11px 20px;
   margin: 5px;
   background: #2563eb;
   color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.session-message button:hover:not(:disabled) {
-  opacity: 0.9;
 }
 
 .session-message .cancel-btn {
   background: #6b7280;
 }
 
-.session-message button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+/* Mobile layout */
 
+@media (max-width: 540px) {
+  .todo-container {
+    margin: 20px auto;
+    padding: 18px;
+  }
+
+  .app-header h1 {
+    font-size: 23px;
+  }
+
+  .todo-item {
+    flex-wrap: wrap;
+  }
+
+  .todo-item span {
+    flex-basis: calc(100% - 40px);
+  }
+
+  .edit-form {
+    flex-wrap: wrap;
+  }
+
+  .edit-form input {
+    flex-basis: 100%;
+  }
+
+  .todo-form button {
+    padding: 10px;
+  }
+}
